@@ -64,6 +64,13 @@ cmake --build build --config Debug
     cmake --build build --config Debug
 
     B4. 运行（Windows）
-    
+
     cd E:\work\unp-labs\build\Debug
     .\demo.exe
+
+提交GitHub模板
+cd E:\work\unp-labs
+git status
+git add CMakeLists.txt src/00_bootstrap/你的新文件.cpp
+git commit -m "add new exercise: xxx"
+git push
