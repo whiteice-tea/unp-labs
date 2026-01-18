@@ -1,43 +1,100 @@
 #pragma once
-#include <string>
-#include <cerrno>
+#include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
-#include <unistd.h>
+#include <string>
 
-[[noreturn]] inline void die(const std::string& msg) {
-    int e = errno;
-    std::cerr << "[FATAL] " << msg << " | errno=" << e
-              << " (" << std::strerror(e) << ")\n";
-    std::exit(1);
-}
+#ifdef _WIN32
+  #ifndef NOMINMAX
+  #define NOMINMAX
+  #endif
+  #define _WINSOCK_DEPRECATED_NO_WARNINGS
+  #include <winsock2.h>
+  #include <ws2tcpip.h>
+  #pragma comment(lib, "Ws2_32.lib")
+  using socket_t = SOCKET;
+  static constexpr socket_t kInvalidSocket = INVALID_SOCKET;
 
-class Fd {
+  inline int last_error() { return WSAGetLastError(); }
+
+  [[noreturn]] inline void die(const std::string& msg) {
+      int e = last_error();
+      std::cerr << "[FATAL] " << msg << " | WSAGetLastError=" << e << "\n";
+      std::exit(1);
+  }
+
+  inline void close_socket(socket_t s) {
+      if (s != kInvalidSocket) ::closesocket(s);
+  }
+
+  struct NetInit {
+      NetInit() {
+          WSADATA wsa{};
+          if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) die("WSAStartup");
+      }
+      ~NetInit() { WSACleanup(); }
+      NetInit(const NetInit&) = delete;
+      NetInit& operator=(const NetInit&) = delete;
+  };
+
+#else
+  #include <arpa/inet.h>
+  #include <netinet/in.h>
+  #include <sys/socket.h>
+  #include <unistd.h>
+  #include <errno.h>
+
+  using socket_t = int;
+  static constexpr socket_t kInvalidSocket = -1;
+
+  inline int last_error() { return errno; }
+
+  [[noreturn]] inline void die(const std::string& msg) {
+      int e = last_error();
+      std::cerr << "[FATAL] " << msg << " | errno=" << e
+                << " (" << std::strerror(e) << ")\n";
+      std::exit(1);
+  }
+
+  inline void close_socket(socket_t s) {
+      if (s != kInvalidSocket) ::close(s);
+  }
+
+  struct NetInit {
+      NetInit() = default;
+      ~NetInit() = default;
+      NetInit(const NetInit&) = delete;
+      NetInit& operator=(const NetInit&) = delete;
+  };
+#endif
+
+class Socket {
 public:
-    Fd() = default;
-    explicit Fd(int fd) : fd_(fd) {}
-    ~Fd() { reset(); }
+    Socket() = default;
+    explicit Socket(socket_t s) : s_(s) {}
+    ~Socket() { reset(); }
 
-    Fd(const Fd&) = delete;
-    Fd& operator=(const Fd&) = delete;
+    Socket(const Socket&) = delete;
+    Socket& operator=(const Socket&) = delete;
 
-    Fd(Fd&& other) noexcept : fd_(other.fd_) { other.fd_ = -1; }
-    Fd& operator=(Fd&& other) noexcept {
+    Socket(Socket&& other) noexcept : s_(other.s_) { other.s_ = kInvalidSocket; }
+    Socket& operator=(Socket&& other) noexcept {
         if (this != &other) {
             reset();
-            fd_ = other.fd_;
-            other.fd_ = -1;
+            s_ = other.s_;
+            other.s_ = kInvalidSocket;
         }
         return *this;
     }
 
-    int get() const { return fd_; }
-    void reset(int newfd = -1) {
-        if (fd_ >= 0) ::close(fd_);
-        fd_ = newfd;
+    socket_t get() const { return s_; }
+    void reset(socket_t news = kInvalidSocket) {
+        if (s_ != kInvalidSocket) close_socket(s_);
+        s_ = news;
     }
-    explicit operator bool() const { return fd_ >= 0; }
+    explicit operator bool() const { return s_ != kInvalidSocket; }
 
 private:
-    int fd_ = -1;
+    socket_t s_ = kInvalidSocket;
 };
