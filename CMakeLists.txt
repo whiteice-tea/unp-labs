@@ -13,13 +13,14 @@ if (WIN32)
     add_executable(tcp_client src/00_bootstrap/tcp_client_win.cpp)
     add_executable(tcp_server src/00_bootstrap/tcp_server_win.cpp)
     add_executable(test_learn src/00_bootstrap/test_learn.cpp) 
+    add_executable(test_learn1 src/00_bootstrap/test_learn1.cpp)
     
 
  
     target_link_libraries(tcp_client common Ws2_32)
     target_link_libraries(tcp_server common Ws2_32)
     target_link_libraries(test_learn common Ws2_32)
-
+    target_link_libraries(test_learn common Ws2_32)
 else()
     add_executable(tcp_client src/00_bootstrap/tcp_client.cpp)
     add_executable(tcp_server src/00_bootstrap/tcp_server.cpp)
